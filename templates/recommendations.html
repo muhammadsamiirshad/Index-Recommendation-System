@@ -1,0 +1,517 @@
+{% extends "layout.html" %}
+
+{% block title %}Index Recommendations | Automated Index Recommendation System{% endblock %}
+
+{% block page_title %}Index Recommendations{% endblock %}
+{% block page_subtitle %}Suggested indexes to improve your database performance{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+    <!-- Filters and actions -->
+    <div class="bg-white shadow rounded-lg p-4">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between">
+            <div class="flex flex-col sm:flex-row sm:space-x-4 space-y-2 sm:space-y-0 mb-4 md:mb-0">
+                <div>
+                    <label for="table-filter" class="block text-sm font-medium text-gray-700 mb-1">Filter by table</label>
+                    <select id="table-filter" class="w-full border-gray-300 rounded-md shadow-sm form-input-focus">
+                        <option value="">All tables</option>
+                        <!-- Tables will be populated via JavaScript -->
+                    </select>
+                </div>
+                
+                <div>
+                    <label for="impact-filter" class="block text-sm font-medium text-gray-700 mb-1">Filter by impact</label>
+                    <select id="impact-filter" class="w-full border-gray-300 rounded-md shadow-sm form-input-focus">
+                        <option value="">All impacts</option>
+                        <option value="high">High</option>
+                        <option value="medium">Medium</option>
+                        <option value="low">Low</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="flex space-x-2">
+                <button id="apply-all-btn" class="px-4 py-2 text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 btn-effect">
+                    <i class="fas fa-check-square mr-2"></i>Apply Selected
+                </button>
+                
+                <button id="refresh-btn" class="px-4 py-2 text-sm font-medium rounded-md text-gray-700 border border-gray-300 bg-white hover:bg-gray-50 btn-effect">
+                    <i class="fas fa-sync-alt mr-2"></i>Refresh Analysis
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recommendations List -->
+    <div class="bg-white shadow rounded-lg overflow-hidden">
+        {% if recommendations %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <div class="flex items-center">
+                                <input id="select-all" type="checkbox" class="h-4 w-4 text-primary-600 border-gray-300 rounded">
+                                <span class="ml-2">Select</span>
+                            </div>
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Table</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Column</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Impact</th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200" id="recommendations-body">
+                    {% for rec in recommendations %}
+                    <tr class="recommendation-row" data-table="{{ rec.table }}" data-impact="{% if rec.score > 7 %}high{% elif rec.score > 4 %}medium{% else %}low{% endif %}">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <input type="checkbox" 
+                                class="recommendation-checkbox h-4 w-4 text-primary-600 border-gray-300 rounded"
+                                data-id="{{ rec.id }}"
+                                data-name="{{ rec.index_name }}"
+                                data-create-stmt="{{ rec.create_statement }}">
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ rec.table }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ rec.column }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ rec.index_type }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <div class="flex items-center">
+                                <span class="text-sm font-medium">{{ rec.score }}</span>
+                                <div class="ml-2 w-16 bg-gray-200 rounded-full h-2">
+                                    <div class="bg-primary-600 h-2 rounded-full" style="width: {{ (rec.score / 10) * 100 }}%"></div>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {% if rec.score > 7 %}
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">High</span>
+                            {% elif rec.score > 4 %}
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">Medium</span>
+                            {% else %}
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">Low</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+                            <button 
+                                class="view-details-btn text-primary-600 hover:text-primary-900"
+                                data-id="{{ rec.id }}"
+                                data-name="{{ rec.index_name }}"
+                                data-table="{{ rec.table }}"
+                                data-column="{{ rec.column }}"
+                                data-type="{{ rec.index_type }}"
+                                data-score="{{ rec.score }}"
+                                data-create-stmt="{{ rec.create_statement }}"
+                                data-query-count="{{ rec.query_count }}"
+                                data-columns="{{ rec.columns }}"
+                            >
+                                <i class="fas fa-info-circle mr-1"></i>Details
+                            </button>
+                            <button 
+                                class="apply-index-btn text-green-600 hover:text-green-900"
+                                data-id="{{ rec.id }}"
+                                data-name="{{ rec.index_name }}"
+                                data-create-stmt="{{ rec.create_statement }}"
+                            >
+                                <i class="fas fa-check mr-1"></i>Apply
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="py-12 text-center">
+            <div class="flex flex-col items-center justify-center">
+                <div class="rounded-full bg-blue-100 p-4 mb-4">
+                    <i class="fas fa-lightbulb text-blue-600 text-2xl"></i>
+                </div>
+                <h3 class="text-lg font-medium text-gray-900 mb-1">No recommendations yet</h3>
+                <p class="text-gray-500 mb-6">Run some queries to generate index recommendations</p>
+                <button id="refresh-empty-btn" class="px-4 py-2 text-sm font-medium rounded-md text-gray-700 border border-gray-300 bg-white hover:bg-gray-50 btn-effect">
+                    <i class="fas fa-sync-alt mr-2"></i>Refresh Analysis
+                </button>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- Details Modal -->
+    <div id="details-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4">
+            <div class="flex justify-between items-center border-b border-gray-200 px-6 py-4">
+                <h3 id="modal-title" class="text-lg font-medium text-gray-900">Index Details</h3>
+                <button class="close-modal text-gray-400 hover:text-gray-500">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div id="modal-content" class="p-6">
+                <!-- Content will be populated via JavaScript -->
+            </div>
+            <div class="bg-gray-50 px-6 py-4 flex justify-end space-x-3">
+                <button class="close-modal px-4 py-2 text-sm font-medium rounded-md text-gray-700 border border-gray-300 bg-white hover:bg-gray-50">
+                    Cancel
+                </button>
+                <button id="modal-apply-btn" class="px-4 py-2 text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700">
+                    Apply Index
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Populate table filter
+    const tableFilter = document.getElementById('table-filter');
+    const recommendationRows = document.querySelectorAll('.recommendation-row');
+    
+    // Extract unique table names
+    const tables = new Set();
+    recommendationRows.forEach(row => {
+        tables.add(row.getAttribute('data-table'));
+    });
+    
+    // Add options to select
+    tables.forEach(table => {
+        const option = document.createElement('option');
+        option.value = table;
+        option.textContent = table;
+        tableFilter.appendChild(option);
+    });
+    
+    // Filter functionality
+    function filterRecommendations() {
+        const selectedTable = tableFilter.value;
+        const selectedImpact = document.getElementById('impact-filter').value;
+        
+        recommendationRows.forEach(row => {
+            const rowTable = row.getAttribute('data-table');
+            const rowImpact = row.getAttribute('data-impact');
+            
+            const tableMatch = !selectedTable || rowTable === selectedTable;
+            const impactMatch = !selectedImpact || rowImpact === selectedImpact;
+            
+            if (tableMatch && impactMatch) {
+                row.classList.remove('hidden');
+            } else {
+                row.classList.add('hidden');
+            }
+        });
+    }
+    
+    // Add event listeners to filters
+    tableFilter.addEventListener('change', filterRecommendations);
+    document.getElementById('impact-filter').addEventListener('change', filterRecommendations);
+    
+    // Select all functionality
+    const selectAllCheckbox = document.getElementById('select-all');
+    const recommendationCheckboxes = document.querySelectorAll('.recommendation-checkbox');
+    
+    selectAllCheckbox.addEventListener('change', function() {
+        const isChecked = this.checked;
+        
+        recommendationCheckboxes.forEach(checkbox => {
+            const row = checkbox.closest('tr');
+            if (!row.classList.contains('hidden')) {
+                checkbox.checked = isChecked;
+            }
+        });
+    });
+    
+    // Helper function to show notifications
+    function showNotification(message, type = 'info') {
+        // Use the global notification function from app.js
+        if (typeof window.showNotification === 'function') {
+            window.showNotification(message, type);
+        } else {
+            alert(message);
+        }
+    }
+    
+    // Apply index functionality
+    document.querySelectorAll('.apply-index-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const indexId = this.getAttribute('data-id');
+            const indexName = this.getAttribute('data-name');
+            const createStatement = this.getAttribute('data-create-stmt');
+            
+            if (confirm(`Are you sure you want to create the index "${indexName}"?`)) {
+                applyIndex(createStatement, indexName, this);
+            }
+        });
+    });
+    
+    // Apply selected functionality
+    document.getElementById('apply-all-btn').addEventListener('click', function() {
+        const selectedCheckboxes = Array.from(document.querySelectorAll('.recommendation-checkbox:checked'));
+        
+        if (selectedCheckboxes.length === 0) {
+            showNotification('Please select at least one index to apply', 'warning');
+            return;
+        }
+        
+        if (confirm(`Are you sure you want to apply ${selectedCheckboxes.length} selected indexes?`)) {
+            const indexes = selectedCheckboxes.map(cb => ({
+                id: cb.getAttribute('data-id'),
+                name: cb.getAttribute('data-name'),
+                createStatement: cb.getAttribute('data-create-stmt')
+            }));
+            
+            let currentIndex = 0;
+            
+            function applyNext() {
+                if (currentIndex >= indexes.length) {
+                    showNotification(`Successfully applied ${indexes.length} indexes`, 'success');
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 2000);
+                    return;
+                }
+                
+                const index = indexes[currentIndex];
+                
+                // Show progress
+                showNotification(`Applying index ${currentIndex + 1}/${indexes.length}: ${index.name}`, 'info');
+                
+                // Apply this index
+                fetch('/api/apply-index', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        create_statement: index.createStatement
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        showNotification(`Error creating index ${index.name}: ${data.error}`, 'error');
+                    }
+                    currentIndex++;
+                    applyNext();
+                })
+                .catch(error => {
+                    showNotification(`Error creating index ${index.name}: ${error}`, 'error');
+                    currentIndex++;
+                    applyNext();
+                });
+            }
+            
+            applyNext();
+        }
+    });
+    
+    function applyIndex(createStmt, indexName, button) {
+        // Disable the button and show loading state
+        const originalHtml = button.innerHTML;
+        button.disabled = true;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Applying...';
+        
+        // Sanitize the SQL statement to ensure proper formatting
+        let sanitizedCreateStmt = createStmt.trim();
+        // Ensure parentheses are properly formatted for SQLite
+        if (sanitizedCreateStmt.indexOf('(') > -1) {
+            // Make sure there are no spaces between column names in parentheses
+            sanitizedCreateStmt = sanitizedCreateStmt.replace(/\(\s+/g, '(');
+            sanitizedCreateStmt = sanitizedCreateStmt.replace(/\s+\)/g, ')');
+        }
+        
+        fetch('/api/apply-index', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                create_statement: sanitizedCreateStmt
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                showNotification(`Error creating index: ${data.error}`, 'error');
+            } else {
+                showNotification(`Index ${indexName} created successfully!`, 'success');
+                
+                // Remove the row or update UI
+                setTimeout(() => {
+                    const row = button.closest('tr');
+                    row.classList.add('bg-green-50');
+                    setTimeout(() => {
+                        row.remove();
+                        // If no more recommendations, show empty state
+                        if (document.querySelectorAll('.recommendation-row').length === 0) {
+                            document.querySelector('.overflow-x-auto').innerHTML = `
+                            <div class="py-12 text-center">
+                                <div class="flex flex-col items-center justify-center">
+                                    <div class="rounded-full bg-green-100 p-4 mb-4">
+                                        <i class="fas fa-check text-green-600 text-2xl"></i>
+                                    </div>
+                                    <h3 class="text-lg font-medium text-gray-900 mb-1">All recommended indexes have been applied</h3>
+                                    <p class="text-gray-500 mb-6">Your database should now be optimized</p>
+                                    <button id="refresh-empty-btn" class="px-4 py-2 text-sm font-medium rounded-md text-gray-700 border border-gray-300 bg-white hover:bg-gray-50 btn-effect">
+                                        <i class="fas fa-sync-alt mr-2"></i>Refresh Analysis
+                                    </button>
+                                </div>
+                            </div>
+                            `;
+                        }
+                    }, 500);
+                }, 1000);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showNotification('Failed to create index. Check console for details.', 'error');
+        })
+        .finally(() => {
+            // Restore button
+            button.disabled = false;
+            button.innerHTML = originalHtml;
+        });
+    }
+    
+    // Refresh analysis functionality
+    const refreshButtons = document.querySelectorAll('#refresh-btn, #refresh-empty-btn');
+    
+    refreshButtons.forEach(btn => {
+        btn.addEventListener('click', function() {
+            // Show loading state
+            const originalHtml = this.innerHTML;
+            this.disabled = true;
+            this.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Refreshing...';
+            
+            // Call API to refresh analysis
+            fetch('/api/refresh-analysis', {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    showNotification(`Error refreshing analysis: ${data.error}`, 'error');
+                } else {
+                    showNotification('Analysis refreshed successfully!', 'success');
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1500);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showNotification('Failed to refresh analysis. Check console for details.', 'error');
+            })
+            .finally(() => {
+                // Restore button
+                this.disabled = false;
+                this.innerHTML = originalHtml;
+            });
+        });
+    });
+    
+    // Details modal functionality
+    const modal = document.getElementById('details-modal');
+    const modalTitle = document.getElementById('modal-title');
+    const modalContent = document.getElementById('modal-content');
+    const modalApplyBtn = document.getElementById('modal-apply-btn');
+    
+    document.querySelectorAll('.view-details-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const id = this.getAttribute('data-id');
+            const name = this.getAttribute('data-name');
+            const table = this.getAttribute('data-table');
+            const column = this.getAttribute('data-column');
+            const type = this.getAttribute('data-type');
+            const score = this.getAttribute('data-score');
+            const createStmt = this.getAttribute('data-create-stmt');
+            const queryCount = this.getAttribute('data-query-count');
+            
+            // Set modal title
+            modalTitle.textContent = `Index Details: ${name}`;
+            
+            // Set modal content
+            modalContent.innerHTML = `
+                <div class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <h4 class="text-sm font-medium text-gray-500">Table</h4>
+                            <p class="text-gray-900">${table}</p>
+                        </div>
+                        <div>
+                            <h4 class="text-sm font-medium text-gray-500">Column</h4>
+                            <p class="text-gray-900">${column}</p>
+                        </div>
+                        <div>
+                            <h4 class="text-sm font-medium text-gray-500">Index Type</h4>
+                            <p class="text-gray-900">${type}</p>
+                        </div>
+                        <div>
+                            <h4 class="text-sm font-medium text-gray-500">Recommendation Score</h4>
+                            <p class="text-gray-900">${score}/10</p>
+                        </div>
+                    </div>
+                    <div>
+                        <h4 class="text-sm font-medium text-gray-500">Create Statement</h4>
+                        <div class="bg-gray-50 p-3 rounded font-mono text-sm overflow-x-auto">${createStmt}</div>
+                    </div>
+                    <div>
+                        <h4 class="text-sm font-medium text-gray-500">Expected Benefits</h4>
+                        <ul class="list-disc list-inside space-y-1 text-gray-700">
+                            <li>Faster query execution for queries filtering on ${column}</li>
+                            <li>Improved performance for JOIN operations involving this column</li>
+                            <li>Potentially ${score > 7 ? 'significant' : score > 4 ? 'moderate' : 'minor'} reduction in database load</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 class="text-sm font-medium text-gray-500">Potential Drawbacks</h4>
+                        <ul class="list-disc list-inside space-y-1 text-gray-700">
+                            <li>Slightly increased disk space usage</li>
+                            <li>Potential slowdown for INSERT/UPDATE/DELETE operations</li>
+                        </ul>
+                    </div>
+                </div>
+            `;
+            
+            // Set apply button data
+            modalApplyBtn.setAttribute('data-id', id);
+            modalApplyBtn.setAttribute('data-name', name);
+            modalApplyBtn.setAttribute('data-create-stmt', createStmt);
+            
+            // Show modal
+            modal.classList.remove('hidden');
+        });
+    });
+    
+    // Modal apply button
+    modalApplyBtn.addEventListener('click', function() {
+        const indexId = this.getAttribute('data-id');
+        const indexName = this.getAttribute('data-name');
+        const createStatement = this.getAttribute('data-create-stmt');
+        
+        // Close modal
+        modal.classList.add('hidden');
+        
+        // Apply index
+        applyIndex(createStatement, indexName, this);
+    });
+    
+    // Close modal functionality
+    document.querySelectorAll('.close-modal').forEach(closeBtn => {
+        closeBtn.addEventListener('click', function() {
+            modal.classList.add('hidden');
+        });
+    });
+    
+    // Close modal when clicking outside
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+            modal.classList.add('hidden');
+        }
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,514 @@
+{% extends "layout.html" %}
+
+{% block title %}Query Editor | Automated Index Recommendation System{% endblock %}
+
+{% block page_title %}Query Editor{% endblock %}
+{% block page_subtitle %}Execute and analyze SQL queries on your database{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+    <!-- Query Editor -->
+    <div class="bg-white shadow rounded-lg p-6">
+        <h2 class="text-lg font-medium text-gray-900 mb-4">SQL Query</h2>
+        
+        <div class="mb-4">
+            <textarea id="query-editor" class="w-full h-48 border border-gray-300 rounded-lg p-2 font-mono text-sm code-editor form-input-focus" placeholder="Enter your SQL query here..."></textarea>
+        </div>
+        
+        <div class="flex justify-between items-center">
+            <div class="flex space-x-2">
+                <button id="run-query-btn" class="px-4 py-2 text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 btn-effect">
+                    <i class="fas fa-play mr-2"></i>Run Query
+                </button>
+                
+                <button id="explain-query-btn" class="px-4 py-2 text-sm font-medium rounded-md text-gray-700 border border-gray-300 bg-white hover:bg-gray-50 btn-effect">
+                    <i class="fas fa-search mr-2"></i>Explain Plan
+                </button>
+            </div>
+            
+            <div>
+                <button id="clear-query-btn" class="px-3 py-2 text-sm font-medium rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 btn-effect">
+                    <i class="fas fa-eraser mr-2"></i>Clear
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Schema Explorer -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div>
+            <div class="bg-white shadow rounded-lg p-6">
+                <h2 class="text-lg font-medium text-gray-900 mb-4">Schema Explorer</h2>
+                
+                <div class="mb-4">
+                    <label for="table-select" class="block text-sm font-medium text-gray-700 mb-1">Select Table</label>
+                    <select id="table-select" class="w-full border-gray-300 rounded-md shadow-sm form-input-focus">
+                        <option value="">-- Select a table --</option>
+                        {% for table in tables %}
+                        <option value="{{ table }}">{{ table }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div id="table-schema" class="mt-4">
+                    <p class="text-gray-500 text-sm italic">Select a table to view its schema</p>
+                </div>
+                
+                <div class="mt-4">
+                    <button id="insert-table-btn" class="w-full px-4 py-2 text-sm font-medium rounded-md text-gray-700 border border-gray-300 bg-white hover:bg-gray-50 btn-effect" disabled>
+                        <i class="fas fa-table mr-2"></i>Insert table name
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Query History -->
+            <div class="mt-6 bg-white shadow rounded-lg p-6">
+                <h2 class="text-lg font-medium text-gray-900 mb-4">Recent Queries</h2>
+                
+                {% if query_history %}
+                <ul class="divide-y divide-gray-200">
+                    {% for item in query_history %}
+                    <li class="py-2">
+                        <a href="#" class="query-history-item block hover:bg-gray-50 p-2 rounded" data-query="{{ item.query }}">
+                            <div class="flex justify-between">
+                                <span class="text-sm text-gray-900 font-medium truncate">{{ item.query[:40] }}{% if item.query|length > 40 %}...{% endif %}</span>
+                                <span class="text-xs text-gray-500">{{ item.execution_time | round(4) }}s</span>
+                            </div>
+                            <div class="text-xs text-gray-500">{{ item.timestamp }}</div>
+                        </a>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-gray-500 text-sm">No query history available</p>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Query Results -->
+        <div class="lg:col-span-2">
+            <div class="bg-white shadow rounded-lg p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-medium text-gray-900">Query Results</h2>
+                    <div id="query-stats" class="text-sm text-gray-500 hidden">
+                        Execution time: <span id="execution-time">0</span>ms | Rows: <span id="row-count">0</span>
+                    </div>
+                </div>
+                
+                <div id="results-container" class="query-result">
+                    <div id="results-placeholder" class="flex flex-col items-center justify-center py-12">
+                        <i class="fas fa-database text-gray-300 text-5xl mb-4"></i>
+                        <p class="text-gray-500">Run a query to see results</p>
+                    </div>
+                    <div id="results-table-container" class="hidden overflow-x-auto">
+                        <table id="results-table" class="min-w-full divide-y divide-gray-200 enhanced">
+                            <thead class="bg-gray-50">
+                                <tr id="results-header"></tr>
+                            </thead>
+                            <tbody id="results-body" class="bg-white divide-y divide-gray-200"></tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <div class="mt-4 flex justify-end space-x-2">
+                    <button id="copy-results-btn" class="px-3 py-2 text-sm font-medium rounded-md text-gray-700 border border-gray-300 bg-white hover:bg-gray-50 btn-effect hidden">
+                        <i class="fas fa-copy mr-1"></i>Copy
+                    </button>
+                    <button id="download-csv-btn" class="px-3 py-2 text-sm font-medium rounded-md text-gray-700 border border-gray-300 bg-white hover:bg-gray-50 btn-effect hidden">
+                        <i class="fas fa-file-csv mr-1"></i>CSV
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Execution Plan -->
+            <div id="execution-plan-container" class="mt-6 bg-white shadow rounded-lg p-6 hidden">
+                <h2 class="text-lg font-medium text-gray-900 mb-4">Execution Plan</h2>
+                
+                <div class="bg-gray-50 p-4 rounded-lg">
+                    <pre id="execution-plan" class="text-sm overflow-x-auto font-mono text-gray-800"></pre>
+                </div>
+                
+                <div id="plan-analysis" class="mt-4 p-4 bg-blue-50 text-blue-800 rounded-lg text-sm hidden"></div>
+                
+                <div id="index-suggestions" class="mt-4 hidden">
+                    <h3 class="font-medium text-gray-900 mb-2">Index Suggestions</h3>
+                    <div id="suggestion-content"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal for Confirmation -->
+<div id="confirm-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-lg shadow-lg p-6 max-w-md w-full">
+        <h3 class="text-lg font-medium text-gray-900 mb-4">Confirm Action</h3>
+        <p id="confirm-message" class="text-gray-700 mb-6"></p>
+        <div class="flex justify-end space-x-3">
+            <button id="cancel-btn" class="px-4 py-2 text-sm font-medium rounded-md text-gray-700 border border-gray-300 bg-white hover:bg-gray-50">
+                Cancel
+            </button>
+            <button id="confirm-btn" class="px-4 py-2 text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700">
+                Confirm
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Elements
+    const queryEditor = document.getElementById('query-editor');
+    const runQueryBtn = document.getElementById('run-query-btn');
+    const explainQueryBtn = document.getElementById('explain-query-btn');
+    const clearQueryBtn = document.getElementById('clear-query-btn');
+    const tableSelect = document.getElementById('table-select');
+    const insertTableBtn = document.getElementById('insert-table-btn');
+    const tableSchema = document.getElementById('table-schema');
+    const resultsPlaceholder = document.getElementById('results-placeholder');
+    const resultsTableContainer = document.getElementById('results-table-container');
+    const resultsHeader = document.getElementById('results-header');
+    const resultsBody = document.getElementById('results-body');
+    const queryStats = document.getElementById('query-stats');
+    const executionTime = document.getElementById('execution-time');
+    const rowCount = document.getElementById('row-count');
+    const copyResultsBtn = document.getElementById('copy-results-btn');
+    const downloadCsvBtn = document.getElementById('download-csv-btn');
+    const executionPlanContainer = document.getElementById('execution-plan-container');
+    const executionPlan = document.getElementById('execution-plan');
+    const planAnalysis = document.getElementById('plan-analysis');
+    const indexSuggestions = document.getElementById('index-suggestions');
+    const suggestionContent = document.getElementById('suggestion-content');
+    
+    // Table selection
+    tableSelect.addEventListener('change', function() {
+        const selectedTable = this.value;
+        insertTableBtn.disabled = !selectedTable;
+        
+        if (selectedTable) {
+            // Fetch table schema
+            fetch(`/get-table-schema/${selectedTable}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        showNotification(data.error, 'error');
+                        return;
+                    }
+                    
+                    // Display schema
+                    const schema = data.schema;
+                    let schemaHtml = '<table class="min-w-full divide-y divide-gray-200 text-sm">';
+                    schemaHtml += '<thead class="bg-gray-50"><tr><th class="px-3 py-2 text-left">Column</th><th class="px-3 py-2 text-left">Type</th><th class="px-3 py-2 text-center">PK</th></tr></thead>';
+                    schemaHtml += '<tbody>';
+                    
+                    schema.forEach(col => {
+                        schemaHtml += `<tr>
+                            <td class="px-3 py-2">${col.name}</td>
+                            <td class="px-3 py-2">${col.type}</td>
+                            <td class="px-3 py-2 text-center">${col.pk ? '✅' : ''}</td>
+                        </tr>`;
+                    });
+                    
+                    schemaHtml += '</tbody></table>';
+                    tableSchema.innerHTML = schemaHtml;
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    tableSchema.innerHTML = `<p class="text-red-500">Error fetching schema</p>`;
+                });
+        } else {
+            tableSchema.innerHTML = '<p class="text-gray-500 text-sm italic">Select a table to view its schema</p>';
+        }
+    });
+    
+    // Insert table name into query
+    insertTableBtn.addEventListener('click', function() {
+        const selectedTable = tableSelect.value;
+        if (selectedTable) {
+            queryEditor.value += selectedTable;
+            queryEditor.focus();
+        }
+    });
+    
+    // Run query
+    runQueryBtn.addEventListener('click', function() {
+        const query = queryEditor.value.trim();
+        
+        if (!query) {
+            showNotification('Please enter a SQL query', 'warning');
+            return;
+        }
+        
+        // Show loading state
+        runQueryBtn.disabled = true;
+        runQueryBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Running...';
+        resultsPlaceholder.innerHTML = '<div class="flex flex-col items-center justify-center py-12"><i class="fas fa-spinner fa-spin text-primary-500 text-4xl mb-4"></i><p class="text-gray-500">Executing query...</p></div>';
+        resultsPlaceholder.classList.remove('hidden');
+        resultsTableContainer.classList.add('hidden');
+        
+        // Make API call
+        fetch('/run-query', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                query: query
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                showNotification(data.error, 'error');
+                resultsPlaceholder.innerHTML = `<div class="flex flex-col items-center justify-center py-12">
+                    <i class="fas fa-exclamation-circle text-red-500 text-5xl mb-4"></i>
+                    <p class="text-red-500">${data.error}</p>
+                </div>`;
+                return;
+            }
+            
+            // Display results
+            displayResults(data);
+            
+            // Store execution plan for later
+            executionPlan.textContent = data.execution_plan;
+            
+            // Show stats
+            queryStats.classList.remove('hidden');
+            executionTime.textContent = (data.execution_time * 1000).toFixed(2);
+            rowCount.textContent = data.results.length;
+            
+            // Show buttons
+            copyResultsBtn.classList.remove('hidden');
+            downloadCsvBtn.classList.remove('hidden');
+            
+            showNotification('Query executed successfully', 'success');
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showNotification('Failed to execute query', 'error');
+            resultsPlaceholder.innerHTML = `<div class="flex flex-col items-center justify-center py-12">
+                <i class="fas fa-exclamation-circle text-red-500 text-5xl mb-4"></i>
+                <p class="text-red-500">Failed to execute query</p>
+            </div>`;
+        })
+        .finally(() => {
+            // Reset button state
+            runQueryBtn.disabled = false;
+            runQueryBtn.innerHTML = '<i class="fas fa-play mr-2"></i>Run Query';
+        });
+    });
+    
+    // Explain query
+    explainQueryBtn.addEventListener('click', function() {
+        const query = queryEditor.value.trim();
+        
+        if (!query) {
+            showNotification('Please enter a SQL query', 'warning');
+            return;
+        }
+        
+        // Show loading state
+        explainQueryBtn.disabled = true;
+        explainQueryBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Explaining...';
+        
+        // Make API call
+        fetch('/run-query', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                query: `EXPLAIN QUERY PLAN ${query}`
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                showNotification(data.error, 'error');
+                return;
+            }
+            
+            // Show execution plan
+            executionPlanContainer.classList.remove('hidden');
+            executionPlan.textContent = data.execution_plan;
+            
+            // Analyze the plan
+            analyzePlan(data.execution_plan);
+            
+            // Show index suggestions if scanning without index
+            if (data.execution_plan.includes('SCAN') && !data.execution_plan.includes('INDEX')) {
+                planAnalysis.classList.remove('hidden');
+                planAnalysis.innerHTML = `<p><i class="fas fa-info-circle mr-2"></i>This query performs a full table scan, which may be slow for large tables.</p>`;
+                
+                // Show potential index suggestions
+                indexSuggestions.classList.remove('hidden');
+                suggestionContent.innerHTML = `<p class="mb-2">Consider creating an index for frequently queried columns:</p>
+                    <a href="{{ url_for('index_recommendations') }}" class="text-primary-600 hover:text-primary-700">
+                        <i class="fas fa-arrow-right mr-1"></i>View recommended indexes
+                    </a>`;
+            } else {
+                planAnalysis.classList.add('hidden');
+                indexSuggestions.classList.add('hidden');
+            }
+            
+            showNotification('Execution plan generated', 'success');
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showNotification('Failed to generate execution plan', 'error');
+        })
+        .finally(() => {
+            // Reset button state
+            explainQueryBtn.disabled = false;
+            explainQueryBtn.innerHTML = '<i class="fas fa-search mr-2"></i>Explain Plan';
+        });
+    });
+    
+    // Clear query
+    clearQueryBtn.addEventListener('click', function() {
+        queryEditor.value = '';
+        queryEditor.focus();
+    });
+    
+    // Display query results
+    function displayResults(data) {
+        if (data.results && data.results.length > 0) {
+            // Show results table
+            resultsPlaceholder.classList.add('hidden');
+            resultsTableContainer.classList.remove('hidden');
+            
+            // Create header
+            resultsHeader.innerHTML = '';
+            data.columns.forEach(column => {
+                const th = document.createElement('th');
+                th.className = 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider';
+                th.textContent = column;
+                resultsHeader.appendChild(th);
+            });
+            
+            // Create body
+            resultsBody.innerHTML = '';
+            data.results.forEach(row => {
+                const tr = document.createElement('tr');
+                
+                data.columns.forEach(column => {
+                    const td = document.createElement('td');
+                    td.className = 'px-6 py-4 whitespace-nowrap text-sm text-gray-900';
+                    td.textContent = row[column] !== null ? row[column] : 'NULL';
+                    tr.appendChild(td);
+                });
+                
+                resultsBody.appendChild(tr);
+            });
+        } else {
+            resultsPlaceholder.innerHTML = `<div class="flex flex-col items-center justify-center py-12">
+                <i class="fas fa-check-circle text-green-500 text-5xl mb-4"></i>
+                <p class="text-gray-500">Query executed successfully with no results to display</p>
+            </div>`;
+        }
+    }
+    
+    // Copy results to clipboard
+    copyResultsBtn.addEventListener('click', function() {
+        if (resultsTableContainer.classList.contains('hidden')) {
+            return;
+        }
+        
+        const rows = [];
+        
+        // Get headers
+        const headers = [];
+        for (let th of resultsHeader.querySelectorAll('th')) {
+            headers.push(th.textContent);
+        }
+        rows.push(headers.join('\t'));
+        
+        // Get data rows
+        for (let tr of resultsBody.querySelectorAll('tr')) {
+            const rowData = [];
+            for (let td of tr.querySelectorAll('td')) {
+                rowData.push(td.textContent);
+            }
+            rows.push(rowData.join('\t'));
+        }
+        
+        // Copy to clipboard
+        const text = rows.join('\n');
+        navigator.clipboard.writeText(text)
+            .then(() => {
+                showNotification('Results copied to clipboard', 'success');
+            })
+            .catch(() => {
+                showNotification('Failed to copy results', 'error');
+            });
+    });
+    
+    // Download as CSV
+    downloadCsvBtn.addEventListener('click', function() {
+        if (resultsTableContainer.classList.contains('hidden')) {
+            return;
+        }
+        
+        const rows = [];
+        
+        // Get headers
+        const headers = [];
+        for (let th of resultsHeader.querySelectorAll('th')) {
+            headers.push(`"${th.textContent}"`);
+        }
+        rows.push(headers.join(','));
+        
+        // Get data rows
+        for (let tr of resultsBody.querySelectorAll('tr')) {
+            const rowData = [];
+            for (let td of tr.querySelectorAll('td')) {
+                // Escape quotes and wrap in quotes
+                const value = td.textContent.replace(/"/g, '""');
+                rowData.push(`"${value}"`);
+            }
+            rows.push(rowData.join(','));
+        }
+        
+        // Create CSV content
+        const csvContent = rows.join('\n');
+        
+        // Create download link
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', `query_results_${new Date().toISOString().slice(0,10)}.csv`);
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        
+        // Trigger download
+        link.click();
+        
+        // Cleanup
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        showNotification('Results downloaded as CSV', 'success');
+    });
+    
+    // Load query history item
+    document.querySelectorAll('.query-history-item').forEach(item => {
+        item.addEventListener('click', function(e) {
+            e.preventDefault();
+            const query = this.getAttribute('data-query');
+            queryEditor.value = query;
+            queryEditor.focus();
+        });
+    });
+    
+    // Analyze execution plan
+    function analyzePlan(plan) {
+        // Simple analysis placeholder - would be expanded in a real implementation
+        console.log("Analyzing plan:", plan);
+    }
+});
+</script>
+{% endblock %}

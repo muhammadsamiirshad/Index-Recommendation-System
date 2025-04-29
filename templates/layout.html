@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Automated Index Recommendation System{% endblock %}</title>
+    
+    <!-- Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            200: '#bae6fd',
+                            300: '#7dd3fc',
+                            400: '#38bdf8',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            800: '#075985',
+                            900: '#0c4a6e',
+                        },
+                        secondary: {
+                            50: '#f5f3ff',
+                            100: '#ede9fe',
+                            200: '#ddd6fe',
+                            300: '#c4b5fd',
+                            400: '#a78bfa',
+                            500: '#8b5cf6',
+                            600: '#7c3aed',
+                            700: '#6d28d9',
+                            800: '#5b21b6',
+                            900: '#4c1d95',
+                        },
+                        tertiary: {
+                            50: '#fff7ed',
+                            100: '#ffedd5',
+                            200: '#fed7aa',
+                            300: '#fdba74',
+                            400: '#fb923c',
+                            500: '#f97316',
+                            600: '#ea580c',
+                            700: '#c2410c',
+                            800: '#9a3412',
+                            900: '#7c2d12',
+                        },
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    
+    <!-- Chart.js for data visualization - with explicit onload handler -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.3.0/dist/chart.umd.min.js"></script>
+    <script>
+        // Verify Chart.js loading
+        window.addEventListener('load', function() {
+            if (typeof Chart === 'undefined') {
+                console.error('Chart.js failed to load properly');
+                // Create a visible error message if Chart.js fails to load
+                var errorDiv = document.createElement('div');
+                errorDiv.style.position = 'fixed';
+                errorDiv.style.top = '0';
+                errorDiv.style.left = '0';
+                errorDiv.style.right = '0';
+                errorDiv.style.backgroundColor = '#fee2e2';
+                errorDiv.style.color = '#b91c1c';
+                errorDiv.style.padding = '1rem';
+                errorDiv.style.textAlign = 'center';
+                errorDiv.style.zIndex = '9999';
+                errorDiv.textContent = 'Warning: Chart.js library failed to load. Some features may not work properly.';
+                document.body.insertBefore(errorDiv, document.body.firstChild);
+            } else {
+                console.log('Chart.js loaded successfully');
+            }
+        });
+    </script>
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    
+    <!-- Additional head content -->
+    {% block head %}{% endblock %}
+    
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col">
+    <!-- Toast container -->
+    <div id="toast-container" class="fixed bottom-4 right-4 flex flex-col space-y-2 z-50"></div>
+
+    <!-- Sidebar -->
+    <div class="flex h-screen overflow-hidden">
+        <!-- Off-canvas menu for mobile -->
+        <div id="mobile-menu" class="fixed inset-0 flex z-40 lg:hidden hidden" role="dialog" aria-modal="true">
+            <div class="fixed inset-0 bg-gray-600 bg-opacity-75" aria-hidden="true" id="mobile-backdrop"></div>
+            
+            <div class="relative flex-1 flex flex-col max-w-xs w-full bg-primary-700">
+                <div class="absolute top-0 right-0 -mr-12 pt-2">
+                    <button type="button" id="close-sidebar-btn" class="ml-1 flex items-center justify-center h-10 w-10 rounded-full focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white">
+                        <span class="sr-only">Close sidebar</span>
+                        <i class="fas fa-times text-white"></i>
+                    </button>
+                </div>
+                
+                <div class="flex-1 h-0 pt-5 pb-4 overflow-y-auto">
+                    <div class="flex-shrink-0 flex items-center px-4">
+                        <h1 class="text-white text-xl font-bold">Index Recommendation</h1>
+                    </div>
+                    <nav class="mt-5 px-2 space-y-1">
+                        <a href="{{ url_for('dashboard') }}" class="group flex items-center px-2 py-2 text-base font-medium rounded-md {% if request.path == url_for('dashboard') %}bg-primary-800 text-white{% else %}text-white hover:bg-primary-600{% endif %}">
+                            <i class="fas fa-tachometer-alt mr-4"></i>
+                            Dashboard
+                        </a>
+                        <a href="{{ url_for('query_editor') }}" class="group flex items-center px-2 py-2 text-base font-medium rounded-md {% if request.path == url_for('query_editor') %}bg-primary-800 text-white{% else %}text-white hover:bg-primary-600{% endif %}">
+                            <i class="fas fa-database mr-4"></i>
+                            Query Editor
+                        </a>
+                        <a href="{{ url_for('index_recommendations') }}" class="group flex items-center px-2 py-2 text-base font-medium rounded-md {% if request.path == url_for('index_recommendations') %}bg-primary-800 text-white{% else %}text-white hover:bg-primary-600{% endif %}">
+                            <i class="fas fa-lightbulb mr-4"></i>
+                            Index Recommendations
+                        </a>
+                        <a href="{{ url_for('performance_metrics') }}" class="group flex items-center px-2 py-2 text-base font-medium rounded-md {% if request.path == url_for('performance_metrics') %}bg-primary-800 text-white{% else %}text-white hover:bg-primary-600{% endif %}">
+                            <i class="fas fa-chart-line mr-4"></i>
+                            Performance Metrics
+                        </a>
+                        <a href="{{ url_for('settings') }}" class="group flex items-center px-2 py-2 text-base font-medium rounded-md {% if request.path == url_for('settings') %}bg-primary-800 text-white{% else %}text-white hover:bg-primary-600{% endif %}">
+                            <i class="fas fa-cog mr-4"></i>
+                            Settings
+                        </a>
+                    </nav>
+                </div>
+                <div class="flex-shrink-0 flex border-t border-primary-800 p-4">
+                    <div class="flex items-center">
+                        <div class="ml-3">
+                            <p class="text-base font-medium text-white">Database</p>
+                            <p class="text-sm font-medium text-primary-200">{{ current_database if current_database else 'Not connected' }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex-shrink-0 w-14">
+                <!-- Force sidebar to shrink to fit close icon -->
+            </div>
+        </div>
+        
+        <!-- Static sidebar for desktop -->
+        <div class="hidden lg:flex lg:flex-shrink-0">
+            <div class="flex flex-col w-64">
+                <div class="flex-1 flex flex-col min-h-0 bg-primary-700">
+                    <div class="flex-1 flex flex-col pt-5 pb-4 overflow-y-auto">
+                        <div class="flex items-center flex-shrink-0 px-4">
+                            <h1 class="text-white text-xl font-bold">Index Recommendation</h1>
+                        </div>
+                        <nav class="mt-5 flex-1 px-2 space-y-1">
+                            <a href="{{ url_for('dashboard') }}" class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {% if request.path == url_for('dashboard') %}bg-primary-800 text-white{% else %}text-white hover:bg-primary-600{% endif %}">
+                                <i class="fas fa-tachometer-alt mr-3"></i>
+                                Dashboard
+                            </a>
+                            <a href="{{ url_for('query_editor') }}" class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {% if request.path == url_for('query_editor') %}bg-primary-800 text-white{% else %}text-white hover:bg-primary-600{% endif %}">
+                                <i class="fas fa-database mr-3"></i>
+                                Query Editor
+                            </a>
+                            <a href="{{ url_for('index_recommendations') }}" class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {% if request.path == url_for('index_recommendations') %}bg-primary-800 text-white{% else %}text-white hover:bg-primary-600{% endif %}">
+                                <i class="fas fa-lightbulb mr-3"></i>
+                                Index Recommendations
+                            </a>
+                            <a href="{{ url_for('performance_metrics') }}" class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {% if request.path == url_for('performance_metrics') %}bg-primary-800 text-white{% else %}text-white hover:bg-primary-600{% endif %}">
+                                <i class="fas fa-chart-line mr-3"></i>
+                                Performance Metrics
+                            </a>
+                            <a href="{{ url_for('settings') }}" class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {% if request.path == url_for('settings') %}bg-primary-800 text-white{% else %}text-white hover:bg-primary-600{% endif %}">
+                                <i class="fas fa-cog mr-3"></i>
+                                Settings
+                            </a>
+                        </nav>
+                    </div>
+                    <div class="flex-shrink-0 flex border-t border-primary-800 p-4">
+                        <div class="flex items-center">
+                            <div>
+                                <p class="text-sm font-medium text-white">Database</p>
+                                <p class="text-xs font-medium text-primary-200">{{ current_database if current_database else 'Not connected' }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="flex flex-col w-0 flex-1 overflow-hidden">
+            <!-- Top navigation -->
+            <div class="relative z-10 flex-shrink-0 flex h-16 bg-white shadow">
+                <button type="button" id="open-sidebar-btn" class="px-4 border-r border-gray-200 text-gray-500 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary-500 lg:hidden">
+                    <span class="sr-only">Open sidebar</span>
+                    <i class="fas fa-bars"></i>
+                </button>
+                <div class="flex-1 px-4 flex justify-between">
+                    <div class="flex-1 flex items-center">
+                        <div class="max-w-2xl w-full">
+                            <h1 class="text-2xl font-semibold text-gray-900">{% block page_title %}Dashboard{% endblock %}</h1>
+                            <p class="text-sm text-gray-500">{% block page_subtitle %}Overview of your database performance{% endblock %}</p>
+                        </div>
+                    </div>
+                    <div class="ml-4 flex items-center md:ml-6">
+                        <!-- Dark mode toggle -->
+                        <button id="dark-mode-toggle" class="bg-white p-1 rounded-full text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
+                            <span class="sr-only">Toggle dark mode</span>
+                            <i class="fas fa-moon"></i>
+                        </button>
+                        
+                        <!-- Notification button -->
+                        <button type="button" class="ml-3 bg-white p-1 rounded-full text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
+                            <span class="sr-only">View notifications</span>
+                            <i class="fas fa-bell"></i>
+                        </button>
+                        
+                        <!-- Profile dropdown -->
+                        <div class="ml-3 relative">
+                            <div>
+                                <button type="button" id="user-menu-button" class="max-w-xs bg-white flex items-center text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500" aria-expanded="false" aria-haspopup="true">
+                                    <span class="sr-only">Open user menu</span>
+                                    <span class="inline-block h-8 w-8 rounded-full overflow-hidden bg-gray-100">
+                                        <i class="fas fa-user-circle text-gray-400 h-8 w-8 pt-1 pl-1"></i>
+                                    </span>
+                                </button>
+                            </div>
+                            <div id="user-menu" class="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 focus:outline-none hidden" role="menu" aria-orientation="vertical" aria-labelledby="user-menu-button">
+                                <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">Your Profile</a>
+                                <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">Switch Database</a>
+                                <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">Export Data</a>
+                                <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">Sign out</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Main content -->
+            <main class="flex-1 relative overflow-y-auto focus:outline-none">
+                <div class="py-6">
+                    <div class="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+                        {% if messages %}
+                        <div class="mb-8">
+                            {% for message in messages %}
+                            <div class="rounded-md p-4 {% if message.type == 'success' %}bg-green-50{% elif message.type == 'error' %}bg-red-50{% elif message.type == 'warning' %}bg-yellow-50{% else %}bg-blue-50{% endif %} mb-4">
+                                <div class="flex">
+                                    <div class="flex-shrink-0">
+                                        {% if message.type == 'success' %}
+                                        <i class="fas fa-check-circle text-green-400"></i>
+                                        {% elif message.type == 'error' %}
+                                        <i class="fas fa-exclamation-circle text-red-400"></i>
+                                        {% elif message.type == 'warning' %}
+                                        <i class="fas fa-exclamation-triangle text-yellow-400"></i>
+                                        {% else %}
+                                        <i class="fas fa-info-circle text-blue-400"></i>
+                                        {% endif %}
+                                    </div>
+                                    <div class="ml-3">
+                                        <h3 class="text-sm font-medium {% if message.type == 'success' %}text-green-800{% elif message.type == 'error' %}text-red-800{% elif message.type == 'warning' %}text-yellow-800{% else %}text-blue-800{% endif %}">
+                                            {{ message.title }}
+                                        </h3>
+                                        <div class="mt-2 text-sm {% if message.type == 'success' %}text-green-700{% elif message.type == 'error' %}text-red-700{% elif message.type == 'warning' %}text-yellow-700{% else %}text-blue-700{% endif %}">
+                                            <p>{{ message.content }}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                        
+                        <!-- Page content -->
+                        {% block content %}{% endblock %}
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+    
+    <!-- Main JavaScript -->
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    
+    <script>
+        // Mobile sidebar toggle
+        document.getElementById('open-sidebar-btn').addEventListener('click', function() {
+            document.getElementById('mobile-menu').classList.remove('hidden');
+        });
+        
+        document.getElementById('close-sidebar-btn').addEventListener('click', function() {
+            document.getElementById('mobile-menu').classList.add('hidden');
+        });
+        
+        document.getElementById('mobile-backdrop').addEventListener('click', function() {
+            document.getElementById('mobile-menu').classList.add('hidden');
+        });
+        
+        // User menu dropdown
+        document.getElementById('user-menu-button').addEventListener('click', function(e) {
+            e.stopPropagation();
+            document.getElementById('user-menu').classList.toggle('hidden');
+        });
+        
+        // Close when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!document.getElementById('user-menu-button').contains(e.target)) {
+                document.getElementById('user-menu').classList.add('hidden');
+            }
+        });
+    </script>
+    
+    <!-- Page specific JS -->
+    {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,350 @@
+{% extends "layout.html" %}
+
+{% block title %}Settings | Automated Index Recommendation System{% endblock %}
+
+{% block page_title %}Settings{% endblock %}
+{% block page_subtitle %}Configure the behavior of the recommendation system{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+    <!-- Settings Form -->
+    <div class="bg-white shadow rounded-lg">
+        <div class="p-6 border-b border-gray-200">
+            <h3 class="text-lg font-medium text-gray-900">Configuration Options</h3>
+            <p class="mt-1 text-sm text-gray-500">
+                These settings control how the index recommendation system analyzes and optimizes your database.
+            </p>
+        </div>
+        
+        <form id="settings-form" class="p-6 space-y-6">
+            <!-- Database Settings -->
+            <div>
+                <h4 class="text-base font-medium text-gray-900 mb-3">Database Configuration</h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                    <div>
+                        <label for="db-file" class="block text-sm font-medium text-gray-700">Database File</label>
+                        <input type="text" name="db_file" id="db-file" class="mt-1 focus:ring-primary-500 focus:border-primary-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md form-input-focus" value="{{ config.database.db_file }}">
+                        <p class="mt-1 text-xs text-gray-500">Path to the SQLite database file</p>
+                    </div>
+                    
+                    <div>
+                        <label for="backup-directory" class="block text-sm font-medium text-gray-700">Backup Directory</label>
+                        <input type="text" name="backup_directory" id="backup-directory" class="mt-1 focus:ring-primary-500 focus:border-primary-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md form-input-focus" value="{{ config.database.backup_directory }}">
+                        <p class="mt-1 text-xs text-gray-500">Directory where database backups are stored</p>
+                    </div>
+                    
+                    <div class="md:col-span-2">
+                        <div class="flex items-center">
+                            <input type="checkbox" name="auto_backup" id="auto-backup" class="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded">
+                            <label for="auto-backup" class="ml-2 block text-sm text-gray-700">Enable Automatic Backups</label>
+                        </div>
+                        <p class="mt-1 text-xs text-gray-500">Create a backup before applying indexes</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Analysis Settings -->
+            <div>
+                <h4 class="text-base font-medium text-gray-900 mb-3">Analysis Configuration</h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                    <div>
+                        <label for="min-index-score" class="block text-sm font-medium text-gray-700">Minimum Index Score</label>
+                        <input type="number" name="min_index_score" id="min-index-score" min="1" max="10" class="mt-1 focus:ring-primary-500 focus:border-primary-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md form-input-focus" value="{{ config.analysis.min_index_score }}">
+                        <p class="mt-1 text-xs text-gray-500">Only show recommendations with this score or higher (1-10)</p>
+                    </div>
+                    
+                    <div>
+                        <label for="log-retention" class="block text-sm font-medium text-gray-700">Log Retention (days)</label>
+                        <input type="number" name="log_retention_days" id="log-retention" min="1" class="mt-1 focus:ring-primary-500 focus:border-primary-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md form-input-focus" value="{{ config.analysis.log_retention_days }}">
+                        <p class="mt-1 text-xs text-gray-500">Number of days to keep query logs</p>
+                    </div>
+                    
+                    <div class="md:col-span-2">
+                        <div class="flex items-center">
+                            <input type="checkbox" name="consider_query_frequency" id="consider-freq" class="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded" {{ "checked" if config.analysis.consider_query_frequency == "true" else "" }}>
+                            <label for="consider-freq" class="ml-2 block text-sm text-gray-700">Consider Query Frequency</label>
+                        </div>
+                        <p class="mt-1 text-xs text-gray-500">Give higher scores to indexes that would improve frequently run queries</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Interface Settings -->
+            <div>
+                <h4 class="text-base font-medium text-gray-900 mb-3">Interface Settings</h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                    <div>
+                        <label for="theme" class="block text-sm font-medium text-gray-700">UI Theme</label>
+                        <select name="theme" id="theme" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm">
+                            <option value="light">Light</option>
+                            <option value="dark">Dark</option>
+                            <option value="system">System Default</option>
+                        </select>
+                        <p class="mt-1 text-xs text-gray-500">Choose your preferred theme</p>
+                    </div>
+                    
+                    <div>
+                        <label for="chart-style" class="block text-sm font-medium text-gray-700">Chart Style</label>
+                        <select name="chart_style" id="chart-style" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm">
+                            <option value="standard">Standard</option>
+                            <option value="colorful">Colorful</option>
+                            <option value="monochrome">Monochrome</option>
+                        </select>
+                        <p class="mt-1 text-xs text-gray-500">Chart color scheme</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="pt-5 border-t border-gray-200">
+                <div class="flex justify-end">
+                    <button type="button" id="reset-defaults-btn" class="px-4 py-2 text-sm font-medium rounded-md text-gray-700 border border-gray-300 hover:bg-gray-50 mr-3">
+                        Reset to Defaults
+                    </button>
+                    <button type="submit" id="save-settings-btn" class="px-4 py-2 text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700">
+                        Save Settings
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+    
+    <!-- Database Actions -->
+    <div class="bg-white shadow rounded-lg">
+        <div class="p-6 border-b border-gray-200">
+            <h3 class="text-lg font-medium text-gray-900">Database Actions</h3>
+            <p class="mt-1 text-sm text-gray-500">
+                Perform maintenance and optimization tasks on your database.
+            </p>
+        </div>
+        
+        <div class="p-6 space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="p-4 border border-gray-200 rounded-md">
+                    <h4 class="text-base font-medium text-gray-900 mb-2">Create Database Backup</h4>
+                    <p class="text-sm text-gray-500 mb-4">Create a complete backup of your current database state.</p>
+                    <button id="backup-db-btn" class="px-4 py-2 text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700">
+                        <i class="fas fa-download mr-1"></i> Backup Now
+                    </button>
+                </div>
+                
+                <div class="p-4 border border-gray-200 rounded-md">
+                    <h4 class="text-base font-medium text-gray-900 mb-2">Optimize Database</h4>
+                    <p class="text-sm text-gray-500 mb-4">Perform VACUUM operation to optimize database and reduce size.</p>
+                    <button id="vacuum-db-btn" class="px-4 py-2 text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700">
+                        <i class="fas fa-broom mr-1"></i> Optimize
+                    </button>
+                </div>
+                
+                <div class="p-4 border border-gray-200 rounded-md">
+                    <h4 class="text-base font-medium text-gray-900 mb-2">Clear Query Logs</h4>
+                    <p class="text-sm text-gray-500 mb-4">Remove all stored query history data (cannot be undone).</p>
+                    <button id="clear-logs-btn" class="px-4 py-2 text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700">
+                        <i class="fas fa-trash-alt mr-1"></i> Clear Logs
+                    </button>
+                </div>
+                
+                <div class="p-4 border border-gray-200 rounded-md">
+                    <h4 class="text-base font-medium text-gray-900 mb-2">Reset Analysis Data</h4>
+                    <p class="text-sm text-gray-500 mb-4">Clear all recommendation data and start fresh.</p>
+                    <button id="reset-analysis-btn" class="px-4 py-2 text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700">
+                        <i class="fas fa-redo mr-1"></i> Reset
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Confirmation Modal -->
+    <div id="confirm-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
+            <div class="flex justify-between items-start mb-4">
+                <h2 class="text-lg font-medium text-gray-900" id="modal-title">Confirm Action</h2>
+                <button class="close-modal text-gray-400 hover:text-gray-500">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div id="modal-content" class="mb-6">
+                <!-- Modal content will be inserted here -->
+            </div>
+            <div class="flex justify-end space-x-3">
+                <button class="close-modal px-4 py-2 text-sm font-medium rounded-md text-gray-700 border border-gray-300 hover:bg-gray-50">
+                    Cancel
+                </button>
+                <button id="modal-confirm-btn" class="px-4 py-2 text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700">
+                    Confirm
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Helper function for showing notifications
+    function showNotification(message, type) {
+        // Use the global notification function if available
+        if (typeof window.showNotification === 'function') {
+            window.showNotification(message, type);
+        } else {
+            alert(message);
+        }
+    }
+    
+    // Handle settings form submission
+    const settingsForm = document.getElementById('settings-form');
+    settingsForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        // Collect form data
+        const formData = new FormData(settingsForm);
+        const settings = {};
+        
+        for (const [key, value] of formData.entries()) {
+            settings[key] = value;
+        }
+        
+        // Add checkbox values (they won't be included if unchecked)
+        settings.auto_backup = formData.has('auto_backup') ? 'true' : 'false';
+        settings.consider_query_frequency = formData.has('consider_query_frequency') ? 'true' : 'false';
+        
+        // Show loading state
+        const saveBtn = document.getElementById('save-settings-btn');
+        const originalText = saveBtn.textContent;
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Saving...';
+        
+        // Simulate API call with timeout
+        setTimeout(function() {
+            saveBtn.disabled = false;
+            saveBtn.textContent = originalText;
+            
+            showNotification('Settings saved successfully!', 'success');
+        }, 1000);
+    });
+    
+    // Reset to defaults button
+    document.getElementById('reset-defaults-btn').addEventListener('click', function() {
+        if (confirm('Are you sure you want to reset all settings to their default values?')) {
+            document.getElementById('db-file').value = 'index_recommendation.db';
+            document.getElementById('backup-directory').value = 'backups';
+            document.getElementById('min-index-score').value = '2';
+            document.getElementById('log-retention').value = '30';
+            document.getElementById('consider-freq').checked = true;
+            document.getElementById('auto-backup').checked = false;
+            document.getElementById('theme').value = 'light';
+            document.getElementById('chart-style').value = 'standard';
+            
+            showNotification('Settings reset to defaults', 'info');
+        }
+    });
+    
+    // Modal functionality
+    const modal = document.getElementById('confirm-modal');
+    const modalTitle = document.getElementById('modal-title');
+    const modalContent = document.getElementById('modal-content');
+    const modalConfirmBtn = document.getElementById('modal-confirm-btn');
+    
+    function showModal(title, content, confirmText, confirmCallback) {
+        modalTitle.textContent = title;
+        modalContent.innerHTML = content;
+        modalConfirmBtn.textContent = confirmText;
+        
+        // Set confirm action
+        modalConfirmBtn.onclick = function() {
+            confirmCallback();
+            closeModal();
+        };
+        
+        modal.classList.remove('hidden');
+    }
+    
+    function closeModal() {
+        modal.classList.add('hidden');
+    }
+    
+    document.querySelectorAll('.close-modal').forEach(btn => {
+        btn.addEventListener('click', closeModal);
+    });
+    
+    // Close when clicking outside
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+            closeModal();
+        }
+    });
+    
+    // Database actions
+    document.getElementById('backup-db-btn').addEventListener('click', function() {
+        const button = this;
+        button.disabled = true;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Backing up...';
+        
+        // Simulate API call
+        setTimeout(function() {
+            button.disabled = false;
+            button.innerHTML = '<i class="fas fa-download mr-1"></i> Backup Now';
+            
+            showNotification('Database backup created successfully', 'success');
+        }, 2000);
+    });
+    
+    document.getElementById('vacuum-db-btn').addEventListener('click', function() {
+        const button = this;
+        button.disabled = true;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Optimizing...';
+        
+        // Simulate API call
+        setTimeout(function() {
+            button.disabled = false;
+            button.innerHTML = '<i class="fas fa-broom mr-1"></i> Optimize';
+            
+            showNotification('Database optimized successfully', 'success');
+        }, 3000);
+    });
+    
+    document.getElementById('clear-logs-btn').addEventListener('click', function() {
+        showModal(
+            'Clear Query Logs',
+            '<p class="text-gray-700">Are you sure you want to clear all query logs? This action cannot be undone and will remove all historical query data.</p>',
+            'Clear Logs',
+            function() {
+                const button = document.getElementById('clear-logs-btn');
+                button.disabled = true;
+                button.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Clearing...';
+                
+                // Simulate API call
+                setTimeout(function() {
+                    button.disabled = false;
+                    button.innerHTML = '<i class="fas fa-trash-alt mr-1"></i> Clear Logs';
+                    
+                    showNotification('Query logs cleared successfully', 'success');
+                }, 1500);
+            }
+        );
+    });
+    
+    document.getElementById('reset-analysis-btn').addEventListener('click', function() {
+        showModal(
+            'Reset Analysis Data',
+            '<p class="text-gray-700 mb-2">Are you sure you want to reset all analysis data?</p><p class="text-gray-700">This will clear all recommendation data and statistics. You\'ll need to run queries again to generate new recommendations.</p>',
+            'Reset Data',
+            function() {
+                const button = document.getElementById('reset-analysis-btn');
+                button.disabled = true;
+                button.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Resetting...';
+                
+                // Simulate API call
+                setTimeout(function() {
+                    button.disabled = false;
+                    button.innerHTML = '<i class="fas fa-redo mr-1"></i> Reset';
+                    
+                    showNotification('Analysis data reset successfully', 'success');
+                }, 1500);
+            }
+        );
+    });
+});
+</script>
+{% endblock %}

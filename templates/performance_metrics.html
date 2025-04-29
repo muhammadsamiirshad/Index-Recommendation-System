@@ -1,0 +1,407 @@
+{% extends "layout.html" %}
+
+{% block title %}Performance Metrics | Automated Index Recommendation System{% endblock %}
+
+{% block page_title %}Performance Metrics{% endblock %}
+{% block page_subtitle %}Monitor and analyze database performance over time{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+    <!-- Performance Overview -->
+    <div class="bg-white shadow rounded-lg p-6">
+        <div class="flex items-center justify-between mb-6">
+            <h2 class="text-lg font-medium text-gray-900">Performance Overview</h2>
+            <div class="flex space-x-2">
+                <button id="day-btn" class="px-3 py-1 text-sm font-medium rounded-md bg-primary-100 text-primary-700">Day</button>
+                <button id="week-btn" class="px-3 py-1 text-sm font-medium rounded-md text-gray-500 hover:bg-gray-100">Week</button>
+                <button id="month-btn" class="px-3 py-1 text-sm font-medium rounded-md text-gray-500 hover:bg-gray-100">Month</button>
+            </div>
+        </div>
+        
+        <div class="h-80">
+            <canvas id="performance-chart"></canvas>
+        </div>
+    </div>
+    
+    <!-- Performance Metrics -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <!-- Query Time -->
+        <div class="bg-white shadow rounded-lg p-6">
+            <h3 class="text-base font-medium text-gray-900 mb-2">Average Query Time</h3>
+            
+            <div class="flex items-center">
+                <div class="rounded-full bg-blue-100 p-3">
+                    <i class="fas fa-clock text-blue-600"></i>
+                </div>
+                <div class="ml-4">
+                    <div class="text-2xl font-semibold text-gray-900">{{ stats.avg_query_time|round(2) }} ms</div>
+                    <div class="text-sm text-gray-500">Per query</div>
+                </div>
+            </div>
+            
+            <div class="mt-4">
+                <div class="flex justify-between items-center mb-1 text-xs text-gray-500">
+                    <div>0 ms</div>
+                    <div>50 ms</div>
+                    <div>100+ ms</div>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div class="bg-blue-500 h-2 rounded-full" style="width: {{ stats.avg_query_time_percentage }}%"></div>
+                </div>
+            </div>
+            
+            <div class="mt-3 text-xs text-gray-500">
+                <span class="inline-block w-2 h-2 bg-blue-500 rounded-full mr-1"></span>
+                Current average
+            </div>
+        </div>
+        
+        <!-- Cache Hit Ratio -->
+        <div class="bg-white shadow rounded-lg p-6">
+            <h3 class="text-base font-medium text-gray-900 mb-2">Cache Hit Ratio</h3>
+            
+            <div class="flex items-center">
+                <div class="rounded-full bg-green-100 p-3">
+                    <i class="fas fa-memory text-green-600"></i>
+                </div>
+                <div class="ml-4">
+                    <div class="text-2xl font-semibold text-gray-900">{{ stats.cache_hit_ratio }}%</div>
+                    <div class="text-sm text-gray-500">Cache utilization</div>
+                </div>
+            </div>
+            
+            <div class="mt-4">
+                <div class="flex justify-between items-center mb-1 text-xs text-gray-500">
+                    <div>0%</div>
+                    <div>50%</div>
+                    <div>100%</div>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div class="bg-green-500 h-2 rounded-full" style="width: {{ stats.cache_hit_ratio }}%"></div>
+                </div>
+            </div>
+            
+            <div class="mt-3 text-xs text-gray-500">
+                <span class="inline-block w-2 h-2 bg-green-500 rounded-full mr-1"></span>
+                Target: 90%+
+            </div>
+        </div>
+        
+        <!-- Database Size -->
+        <div class="bg-white shadow rounded-lg p-6">
+            <h3 class="text-base font-medium text-gray-900 mb-2">Database Size</h3>
+            
+            <div class="flex items-center">
+                <div class="rounded-full bg-purple-100 p-3">
+                    <i class="fas fa-database text-purple-600"></i>
+                </div>
+                <div class="ml-4">
+                    <div class="text-2xl font-semibold text-gray-900">{{ stats.database_size }}</div>
+                    <div class="text-sm text-gray-500">Current size</div>
+                </div>
+            </div>
+            
+            <div class="mt-4">
+                <div class="flex justify-between items-center mb-1 text-xs text-gray-500">
+                    <div>0 MB</div>
+                    <div>50 MB</div>
+                    <div>100 MB</div>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div class="bg-purple-500 h-2 rounded-full" style="width: {{ stats.database_size_percentage }}%"></div>
+                </div>
+            </div>
+            
+            <div class="mt-3 text-xs text-gray-500">
+                <span class="inline-block w-2 h-2 bg-purple-500 rounded-full mr-1"></span>
+                Growth trend: Stable
+            </div>
+        </div>
+    </div>
+    
+    <!-- Index Impact Analysis -->
+    <div class="bg-white shadow rounded-lg p-6">
+        <h2 class="text-lg font-medium text-gray-900 mb-6">Index Impact Analysis</h2>
+        
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Index Name</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created On</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Table</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Usage Count</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Performance Impact</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    <!-- Sample data - would be populated dynamically in a real implementation -->
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">idx_users_username</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">2023-04-15</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">users</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">142</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="flex items-center">
+                                <span class="text-sm text-green-600 font-medium">+42%</span>
+                                <div class="ml-2 w-24 bg-gray-200 rounded-full h-2">
+                                    <div class="bg-green-500 h-2 rounded-full" style="width: 42%"></div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">idx_orders_date</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">2023-04-18</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">orders</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">87</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="flex items-center">
+                                <span class="text-sm text-green-600 font-medium">+28%</span>
+                                <div class="ml-2 w-24 bg-gray-200 rounded-full h-2">
+                                    <div class="bg-green-500 h-2 rounded-full" style="width: 28%"></div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">idx_products_category</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">2023-04-20</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">products</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">65</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="flex items-center">
+                                <span class="text-sm text-green-600 font-medium">+19%</span>
+                                <div class="ml-2 w-24 bg-gray-200 rounded-full h-2">
+                                    <div class="bg-green-500 h-2 rounded-full" style="width: 19%"></div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <!-- Query Type Distribution -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Query Types Chart -->
+        <div class="bg-white shadow rounded-lg p-6">
+            <h2 class="text-lg font-medium text-gray-900 mb-6">Query Type Distribution</h2>
+            
+            <div class="h-64">
+                <canvas id="query-types-chart"></canvas>
+            </div>
+        </div>
+        
+        <!-- Most Expensive Queries -->
+        <div class="bg-white shadow rounded-lg p-6">
+            <h2 class="text-lg font-medium text-gray-900 mb-6">Most Expensive Queries</h2>
+            
+            <div class="space-y-4">
+                <div class="bg-gray-50 p-4 rounded-lg">
+                    <div class="flex justify-between items-start mb-2">
+                        <div class="font-mono text-sm text-gray-800 mr-4">SELECT * FROM products WHERE category = 'Electronics' ORDER BY price DESC</div>
+                        <div class="flex-shrink-0 text-sm font-medium text-red-600">85ms</div>
+                    </div>
+                    <div class="text-xs text-gray-500">Executed 47 times • Last run: 2 hours ago</div>
+                </div>
+                
+                <div class="bg-gray-50 p-4 rounded-lg">
+                    <div class="flex justify-between items-start mb-2">
+                        <div class="font-mono text-sm text-gray-800 mr-4">SELECT o.*, u.username FROM orders o JOIN users u ON o.user_id = u.user_id WHERE o.status = 'pending'</div>
+                        <div class="flex-shrink-0 text-sm font-medium text-red-600">62ms</div>
+                    </div>
+                    <div class="text-xs text-gray-500">Executed 31 times • Last run: 45 minutes ago</div>
+                </div>
+                
+                <div class="bg-gray-50 p-4 rounded-lg">
+                    <div class="flex justify-between items-start mb-2">
+                        <div class="font-mono text-sm text-gray-800 mr-4">SELECT * FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE created_at > '2023-04-01')</div>
+                        <div class="flex-shrink-0 text-sm font-medium text-red-600">58ms</div>
+                    </div>
+                    <div class="text-xs text-gray-500">Executed 19 times • Last run: 1 day ago</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    try {
+        console.log("DOM loaded, initializing charts");
+        
+        // Parse data safely using JSON.parse with the |tojson|safe filter combination
+        let dailyLabels = JSON.parse('{{ performance_data.daily.labels|tojson|safe }}');
+        let dailyData = JSON.parse('{{ performance_data.daily.avg_query_time|tojson|safe }}');
+        let weeklyLabels = JSON.parse('{{ performance_data.weekly.labels|tojson|safe }}');
+        let weeklyData = JSON.parse('{{ performance_data.weekly.avg_query_time|tojson|safe }}');
+        let monthlyLabels = JSON.parse('{{ performance_data.monthly.labels|tojson|safe }}');
+        let monthlyData = JSON.parse('{{ performance_data.monthly.avg_query_time|tojson|safe }}');
+        
+        console.log("Data parsed successfully");
+        
+        // Check if Chart is available before using it
+        if (typeof Chart === 'undefined') {
+            console.error("Chart.js is not loaded. Please check your network connection or script includes.");
+            document.getElementById('performance-chart').insertAdjacentHTML('beforebegin', 
+                '<div class="p-4 bg-red-100 text-red-700 rounded">Error: Chart.js library is not loaded.</div>');
+            return;
+        }
+        
+        // Initialize performance chart
+        const ctx = document.getElementById('performance-chart').getContext('2d');
+        console.log("Got chart context");
+        
+        let performanceChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: dailyLabels,
+                datasets: [{
+                    label: 'Average Query Time (ms)',
+                    data: dailyData,
+                    backgroundColor: 'rgba(14, 165, 233, 0.2)',
+                    borderColor: 'rgba(14, 165, 233, 1)',
+                    borderWidth: 2,
+                    pointBackgroundColor: 'rgba(14, 165, 233, 1)',
+                    pointRadius: 3,
+                    tension: 0.2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Query Time (ms)'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Date'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false
+                    }
+                }
+            }
+        });
+        
+        console.log("Performance chart initialized");
+        
+        // Initialize query types chart
+        const pieCtx = document.getElementById('query-types-chart').getContext('2d');
+        
+        try {
+            new Chart(pieCtx, {
+                type: 'pie',
+                data: {
+                    labels: ['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'OTHER'],
+                    datasets: [{
+                        data: [65, 15, 12, 5, 3],
+                        backgroundColor: [
+                            'rgba(14, 165, 233, 0.7)',
+                            'rgba(139, 92, 246, 0.7)',
+                            'rgba(249, 115, 22, 0.7)',
+                            'rgba(239, 68, 68, 0.7)',
+                            'rgba(107, 114, 128, 0.7)'
+                        ],
+                        borderColor: [
+                            'rgba(14, 165, 233, 1)',
+                            'rgba(139, 92, 246, 1)',
+                            'rgba(249, 115, 22, 1)',
+                            'rgba(239, 68, 68, 1)',
+                            'rgba(107, 114, 128, 1)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.raw || 0;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = Math.round((value / total) * 100);
+                                    return `${label}: ${percentage}% (${value} queries)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+            console.log("Query types chart initialized");
+        } catch(e) {
+            console.error("Error initializing pie chart:", e);
+        }
+        
+        // Time period switcher
+        document.getElementById('day-btn').addEventListener('click', function() {
+            updateChartData(
+                dailyLabels,
+                dailyData,
+                this
+            );
+        });
+        
+        document.getElementById('week-btn').addEventListener('click', function() {
+            updateChartData(
+                weeklyLabels,
+                weeklyData,
+                this
+            );
+        });
+        
+        document.getElementById('month-btn').addEventListener('click', function() {
+            updateChartData(
+                monthlyLabels,
+                monthlyData,
+                this
+            );
+        });
+        
+        function updateChartData(labels, data, button) {
+            performanceChart.data.labels = labels;
+            performanceChart.data.datasets[0].data = data;
+            performanceChart.update();
+            
+            // Update button states
+            document.querySelectorAll('#day-btn, #week-btn, #month-btn').forEach(btn => {
+                btn.classList.remove('bg-primary-100', 'text-primary-700');
+                btn.classList.add('text-gray-500', 'hover:bg-gray-100');
+            });
+            
+            button.classList.remove('text-gray-500', 'hover:bg-gray-100');
+            button.classList.add('bg-primary-100', 'text-primary-700');
+        }
+    } catch(error) {
+        console.error("Critical error in chart initialization:", error);
+        // Show a visible error to the user
+        document.querySelector('.space-y-8').insertAdjacentHTML('beforebegin', 
+            '<div class="bg-red-100 text-red-700 p-4 rounded mb-4">An error occurred while loading the performance metrics. Please check the console for details.</div>');
+    }
+});
+</script>
+{% endblock %}
