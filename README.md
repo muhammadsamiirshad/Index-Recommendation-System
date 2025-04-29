@@ -224,7 +224,7 @@ Planned future enhancements include:
 
 ## 👥 Project Contributors
 
-This project was developed by the Database Management Team (2023-cs-656,666,678) as part of the Advanced Database Management System course.
+This project was developed by Muhammad Sami as part of the Advanced Database Management System course.
 
 ## 📄 License
 
@@ -232,4 +232,4 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ---
 
-© 2025 Database Management Team | Advanced Database Management System Project
+© 2025 Muhammad Sami
